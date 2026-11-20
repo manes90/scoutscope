@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScoutScope — VALORANT Tactical Scouting for Cloud9 Coaches</title>
+<meta name="description" content="ScoutScope turns opponent match data into visual, coach-ready tactical insights: utility heatmaps, Operator tendency profiles and data-backed anti-strats. Built with JetBrains IntelliJ IDEA 2025.3 (free core) for the Cloud9 x JetBrains Sky's the Limit Hackathon 2026 (Category 1).">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◉</span>
+    <div>
+      <h1>ScoutScope</h1>
+      <p>VALORANT tactical scouting · Category 1 · Cloud9 × JetBrains Hackathon 2026</p>
+    </div>
+  </div>
+  <div class="demo-badge" title="All numbers on this page come from the built-in demo dataset unless you import real data.">DEMO DATASET — SYNTHETIC</div>
+</header>
+
+<section class="filters" aria-label="Filters">
+  <label>Opponent
+    <select id="f-team"></select>
+  </label>
+  <label>Map
+    <select id="f-map"></select>
+  </label>
+  <label>Utility type
+    <select id="f-cat"></select>
+  </label>
+  <label>Ability
+    <select id="f-ability"></select>
+  </label>
+  <label>Player
+    <select id="f-player"></select>
+  </label>
+  <p id="team-style" class="team-style"></p>
+</section>
+
+<nav id="tabs" class="tabs" aria-label="Sections"></nav>
+
+<main id="view" class="view"></main>
+
+<footer class="footer">
+  <p><strong>ScoutScope</strong> — built with <strong>JetBrains IntelliJ IDEA 2025.3 (free core)</strong> for the Cloud9 × JetBrains: Sky’s the Limit Hackathon 2026, Category 1 (VALORANT Tactical Scouting, Utility Placement &amp; Operator Profiler).</p>
+  <p>Maps are original schematic diagrams drawn for this tool (not to scale, no Riot artwork). Agent and ability names are used descriptively for scouting, as in the official category blueprint. Demo data is fictional and synthetic; import real GRID telemetry from the Data &amp; Evidence tab. Open source under the MIT License — see the repo README.</p>
+  <p class="muted">Not affiliated with Cloud9, JetBrains, Riot Games or GRID. VALORANT is a trademark of Riot Games, Inc.</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
