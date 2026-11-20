@@ -2,3 +2,17 @@ node_modules/
 .idea/workspace.xml
 .idea/tasks.xml
 inspections/out/
+inspections/out*/
+video/frames/
+tools/
+
+# Sky's The Limit 2026 hackathon data (GRID/Cloud9 starter repo):
+# licensed for this project only, must never be committed (redistribution).
+# Data lives in the sibling clone ../stl-hackathon-2026-grid-starter/.
+stl-hackathon-2026-grid-starter/
+*.zst
+*.jsonl
+*.parquet
+*.sqlite
+*.duckdb
+video/footage/
