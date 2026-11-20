@@ -35,23 +35,28 @@ SHA-256 of the downloaded tarball verified against JetBrains' checksum file
    (ES6 language level, no JDK — a static web project needs none),
    `.idea/vcs.xml` (Git). These files are committed in the repo.
 2. **Code inspection (headless).** `bin/inspect.sh` was run against the
-   project with a small inspection profile
-   (`inspections/scoutscope-profile.xml`); report in `inspections/out/`.
-   This is the IDE genuinely analysing the project's own code — not a
-   screenshot of an editor. **Result (2026-11-19): exit 0, zero problems
-   reported** by the enabled inspections (unresolved JS variables/functions,
-   unknown HTML tags). The 2.3 MB `.descriptions.xml` catalog in
-   `inspections/out/` is the run's output (git-ignored; kept on disk).
+   project with the full inspection profile
+   (`inspections/scoutscope-profile.xml`, 90+ JS/HTML/CSS inspections);
+   report in `inspections/out4/`, triaged in `inspections/RESULTS.md`.
+   **Result (2026-11-20): exit 0, 454 problems reported — 433 noise
+   (missing MDN compat DB, JS template literals, Node globals without
+   Node types), 6 real minor issues (dead locals/constants, fixed), 3
+   intentional (a deliberate test seam), 12 negative-control hits
+   (probe files, since deleted).** An earlier "zero problems" claim
+   (2026-11-19) rested on a broken run — the profile had never loaded
+   (relative paths) — and is corrected here; see RESULTS.md for the
+   full triage. This is the IDE genuinely analysing the project's own
+   code — not a screenshot of an editor.
 3. **Verification.** IntelliJ's own runtime and the Node smoke test
    (`test/smoke-test.js`) both pass over the same files.
 
 ## What was NOT used
 
 - No paid JetBrains product, no All Products Pack / AI Ultimate code from
-  hackathon registration (those codes are issued by email after joining on
-  Devpost — a browser step that is still pending, see `DEVPOST_DRAFT.md`),
-  no Junie, no JetBrains Air. The free core covered a dependency-free static
-  web app completely.
+  hackathon registration (Devpost join done 17:25 WIB 20 Nov 2026; the
+  welcome email arrived 17:24 WIB with the starter-repo link but no AI
+  code — Gmail checked), no Junie, no JetBrains Air. The free core
+  covered a dependency-free static web app completely.
 
 ## Reproduce
 
