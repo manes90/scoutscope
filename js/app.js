@@ -5,12 +5,12 @@
 // ============================================================================
 'use strict';
 
-/* global MAPS, TEAMS, ABILITIES, CATEGORY_LABELS, DEMO, ANTISTRAT */
+/* global MAPS, TEAMS, ABILITIES, CATEGORY_LABELS, REAL, ANTISTRAT, ANTISTRAT_SPOT, expandReal */
 
 const state = {
   tab: 'overview',
-  team: 'IW',
-  map: 'Ascent',
+  team: 'C9',
+  map: 'Bind',
   side: 'def',
   category: 'all',
   ability: 'all',
@@ -19,8 +19,12 @@ const state = {
   imported: null, // { utilityEvents, operatorEvents, label } from CSV import
 };
 
+// The built-in dataset is the REAL aggregates, expanded to rows once and cached.
+let cachedReal = null;
 function data() {
-  return state.imported || DEMO;
+  if (state.imported) return state.imported;
+  if (!cachedReal) cachedReal = expandReal();
+  return cachedReal;
 }
 
 function $(id) { return document.getElementById(id); }
@@ -45,15 +49,19 @@ function filteredOperator() {
 
 function team() { return TEAMS.find((t) => t.id === state.team); }
 
-// Defensive rounds in the demo set per team per map (denominator for %).
+// Defensive (or attacking, per state.side) rounds in the current dataset
+// per team per map — the denominator for every rate on this page.
 function roundsAnalyzed() {
-  return state.imported ? state.imported.rounds || '—' : 20;
+  if (state.imported) return state.imported.rounds || '—';
+  const d = data().rounds && data().rounds[`${state.team}|${state.map}`];
+  if (!d) return 0;
+  return state.side === 'def' ? d.def : d.atk;
 }
 
 // ---------------------------------------------------------------------------
 // Map rendering (original schematic SVG, drawn from MAPS zones)
 // ---------------------------------------------------------------------------
-const CAT_COLORS = { placeable: '#ffd23f', recon: '#4cc9f0', smoke: '#b5179e', flash: '#ff6b35', stall: '#80ed99' };
+const CAT_COLORS = { placeable: '#ffd23f', recon: '#4cc9f0', smoke: '#b5179e', flash: '#ff6b35', stall: '#80ed99', wall: '#7209b7', movement: '#00b4d8', damage: '#ef476f', ult: '#f4a261', support: '#90be6d' };
 const ANGLE_COLORS = { aggressive: '#ff5964', pixel: '#ffd23f', passive: '#4cc9f0' };
 
 function mapSVG(events, opts) {
@@ -71,7 +79,7 @@ function mapSVG(events, opts) {
     // Density blobs: one radial blob per cluster label.
     const byLabel = {};
     for (const e of events) (byLabel[e.label] = byLabel[e.label] || []).push(e);
-    for (const [label, list] of Object.entries(byLabel)) {
+    for (const [, list] of Object.entries(byLabel)) {
       const cx = list.reduce((a, e) => a + e.x, 0) / list.length;
       const cy = list.reduce((a, e) => a + e.y, 0) / list.length;
       const intensity = Math.min(0.5, 0.10 + list.length * 0.015);
@@ -93,9 +101,12 @@ function mapSVG(events, opts) {
         + `<title>Your setup: ${esc(p.name)} — ${esc(p.ability)}</title></g>`;
     }
   }
-  // Zone labels last so markers never hide them.
+  // Zone labels last, on a dark pill so dense markers never hide them.
   for (const z of map.zones) {
-    s += `<text x="${z.x + z.w / 2}" y="${z.y + z.h / 2 + 1.2}" class="map-label">${esc(z.label)}</text>`;
+    const cx = z.x + z.w / 2, cy = z.y + z.h / 2 + 1.2;
+    const w = z.label.length * 2.0 + 3;
+    s += `<rect x="${(cx - w / 2).toFixed(1)}" y="${(cy - 4.2).toFixed(1)}" width="${w.toFixed(1)}" height="5.2" rx="2.2" class="map-label-bg"/>`
+      + `<text x="${cx}" y="${cy}" class="map-label">${esc(z.label)}</text>`;
   }
   s += '</svg>';
   return s;
@@ -115,8 +126,10 @@ function topTendencies() {
     byKey[k].players.add(e.player);
   }
   return Object.values(byKey)
-    .map((t) => ({ ...t, pct: Math.round((t.n / rounds) * 100), players: [...t.players].join(', ') }))
-    .sort((a, b) => b.pct - a.pct)
+    // Rates are casts per round, not percentages: a team can cast the same
+    // ability twice in one round (two charges), so the rate can exceed 1.0.
+    .map((t) => ({ ...t, pct: Math.round((t.n / rounds) * 100), perRound: +(t.n / rounds).toFixed(2), players: [...t.players].join(', ') }))
+    .sort((a, b) => b.perRound - a.perRound)
     .slice(0, 5);
 }
 
@@ -165,8 +178,15 @@ function renderFilters() {
     Object.keys(ABILITIES).map((a) => `<option ${a === state.ability ? 'selected' : ''}>${a}</option>`).join('');
   const plSel = $('f-player');
   const players = team().players;
+  // Agent shown is the one the player used on the CURRENT map (agents differ
+  // per map in the real series) — read from the data, fall back to the roster.
+  const agentOnMap = (handle) => {
+    const row = [...data().utilityEvents, ...data().operatorEvents]
+      .find((e) => e.map === state.map && e.player === handle);
+    return row ? row.agent : (players.find((p) => p.handle === handle) || {}).agent || '—';
+  };
   plSel.innerHTML = `<option value="all">All players</option>` +
-    players.map((p) => `<option value="${p.handle}" ${p.handle === state.player ? 'selected' : ''}>${esc(p.handle)} — ${esc(p.agent)}</option>`).join('');
+    players.map((p) => `<option value="${p.handle}" ${p.handle === state.player ? 'selected' : ''}>${esc(p.handle)} — ${esc(agentOnMap(p.handle))}</option>`).join('');
   $('team-style').textContent = `${team().name} — ${team().style}`;
 }
 
@@ -178,9 +198,9 @@ function insightCards() {
     <article class="card insight">
       <div class="rank">#${i + 1}</div>
       <div>
-        <h3>${esc(x.ability)} at ${esc(x.label)} — <strong>${x.pct}%</strong> of defensive rounds</h3>
+        <h3>${esc(x.ability)} at ${esc(x.label)} — <strong>${x.perRound} per defensive round</strong></h3>
         <p>${esc(x.n)} placements in ${rounds} rounds analysed · ${esc(x.category)} · ${esc(x.players)}</p>
-        <p class="evidence">Evidence: n=${x.n} events, ${rounds} rounds, ${state.imported ? 'imported data' : 'demo dataset (12 matches)'}. ${x.pct >= 50 ? 'High-confidence tendency — build the anti-strat around this.' : 'Moderate tendency — verify on VOD before committing.'}</p>
+        <p class="evidence">Evidence: n=${x.n} events, ${rounds} rounds, ${state.imported ? 'imported data' : 'GRID series 2819676 (Cloud9 vs FURIA, 2025-07-18)'}. ${x.perRound >= 0.5 ? 'High-confidence tendency — build the anti-strat around this.' : 'Moderate tendency — verify on VOD before committing.'}</p>
       </div>
     </article>`).join('');
 }
@@ -191,7 +211,7 @@ function renderOverview() {
     <section class="grid-2">
       <div>
         <h2>Key findings — ${esc(team().name)} on ${esc(state.map)}</h2>
-        <p class="muted">Defence, ${roundsAnalyzed()} rounds analysed · ${state.imported ? esc(state.imported.label) : 'Demo dataset — synthetic, 12 matches'}. Every claim below shows its sample size.</p>
+        <p class="muted">Defence, ${roundsAnalyzed()} rounds analysed · ${state.imported ? esc(state.imported.label) : 'GRID series 2819676 — Cloud9 vs FURIA (2–0), VCT Americas Stage 2 2025, 2025-07-18'}. Every claim below shows its sample size.</p>
         ${insightCards()}
       </div>
       <div>
@@ -231,7 +251,7 @@ function renderHeatmap() {
     byLabel[k] = (byLabel[k] || 0) + 1;
   }
   const rows = Object.entries(byLabel).sort((a, b) => b[1] - a[1]).slice(0, 8)
-    .map(([k, n]) => `<tr><td>${esc(k)}</td><td>${n}/${rounds} rounds</td><td><b>${Math.round((n / rounds) * 100)}%</b></td></tr>`).join('');
+    .map(([k, n]) => `<tr><td>${esc(k)}</td><td>${n}/${rounds} rounds</td><td><b>${(n / rounds).toFixed(2)} per round</b></td></tr>`).join('');
   $('view').innerHTML = `
     <h2>Utility placement — ${esc(team().name)} · ${esc(state.map)} · defence</h2>
     <p class="muted">${events.length} placements plotted · ${rounds} rounds analysed · schematic map (original diagram, not to scale). Toggle the heat overlay to see density at a glance.</p>
@@ -273,7 +293,7 @@ function renderProfiler() {
       <article class="card">
         <h3>Setup spots</h3>
         <table class="tbl"><thead><tr><th>Spot</th><th>Rounds</th><th>Share</th></tr></thead><tbody>${spotRows}</tbody></table>
-        <p><strong>Coach read:</strong> ${esc(op.player)} buys the Operator in ${op.buyRate}% of rounds, favours ${esc(op.topSpot)} (${op.topSpotPct}%), and sets up ${op.earlyPct}% of the time inside the first 20 seconds. ${op.aggressivePct >= 60 ? 'Expect early aggression — pre-smoke the angle.' : 'Mostly disciplined holds — take the space, don’t repeek.'}</p>
+        <p><strong>Coach read:</strong> ${esc(op.player)} holds the Operator in ${op.buyRate}% of rounds, favours ${esc(op.topSpot)} (${op.topSpotPct}%), and sets up ${op.earlyPct}% of the time inside the first 20 seconds. ${op.aggressivePct >= 60 ? 'Expect early aggression — pre-smoke the angle.' : 'Mostly disciplined holds — take the space, don’t repeek.'}</p>
       </article>
     </section>` : '<p class="muted">No Operator rounds match the current filters.</p>'}`;
 }
@@ -282,9 +302,9 @@ function renderAntiStrat() {
   const t = topTendencies();
   const op = operatorSummary();
   const cards = t.map((x) => {
-    const play = ANTISTRAT[x.ability] || ANTISTRAT.Operator;
+    const play = (ANTISTRAT_SPOT[`${x.ability} @ ${x.label}`]) || ANTISTRAT[x.ability] || ANTISTRAT.Default;
     return `<article class="card">
-      <h3>vs ${esc(x.ability)} @ ${esc(x.label)} (${x.pct}%)</h3>
+      <h3>vs ${esc(x.ability)} @ ${esc(x.label)} (${x.perRound} per round)</h3>
       <p><strong>${esc(play.title)}.</strong> ${esc(play.body)}</p>
       <p class="evidence">Based on ${x.n} events in ${roundsAnalyzed()} rounds · ${esc(x.players)}</p>
     </article>`;
@@ -294,7 +314,7 @@ function renderAntiStrat() {
     <p class="muted">Each counter below is tied to one measured tendency (with its sample size), not a guess. Present this page in the pre-match meeting.</p>
     <div class="grid-2">${cards || '<p class="muted">No tendencies to counter in this filter.</p>'}</div>
     ${op && op.aggressivePct >= 50 ? `<article class="card"><h3>vs the Operator (${esc(op.player)}, ${op.buyRate}% buy rate)</h3>
-      <p><strong>${esc(ANTISTRAT.Operator.title)}.</strong> ${esc(ANTISTRAT.Operator.body)}</p>
+      <p><strong>${esc((ANTISTRAT.Operator || ANTISTRAT.Default).title)}.</strong> ${esc((ANTISTRAT.Operator || ANTISTRAT.Default).body)}</p>
       <p class="evidence">Based on ${op.n} Operator rounds · top spot ${esc(op.topSpot)} (${op.topSpotPct}%)</p></article>` : ''}
     <article class="card">
       <h3>Self-scouting note</h3>
@@ -358,7 +378,6 @@ function renderPlanner() {
     render();
   });
   document.querySelectorAll('.del-setup').forEach((b) => b.addEventListener('click', () => {
-    const idx = plannerSetups.findIndex((p) => p.map === state.map);
     const mineIdx = +b.dataset.i;
     const target = mine[mineIdx];
     plannerSetups = plannerSetups.filter((p) => p !== target);
@@ -377,20 +396,21 @@ function renderData() {
     <section class="grid-2">
       <article class="card">
         <h3>What you are looking at</h3>
-        <p><strong>${state.imported ? esc(state.imported.label) : 'Demo dataset (synthetic).'}</strong></p>
+        <p><strong>${state.imported ? esc(state.imported.label) : 'GRID series 2819676 — Cloud9 vs FURIA (2–0), VCT Americas Stage 2 2025, 2025-07-18.'}</strong></p>
         <ul>
           <li>Utility events: <b>${d.utilityEvents.length}</b></li>
           <li>Operator rounds: <b>${d.operatorEvents.length}</b></li>
           <li>Rounds analysed per team / map: <b>${roundsAnalyzed()}</b></li>
-          <li>Matches: <b>${state.imported ? 'as imported' : '12 (demo)'}</b></li>
+          <li>Matches: <b>${state.imported ? 'as imported' : '1 series (Haven 13–5, Bind 13–4; 35 rounds won)'}</b></li>
         </ul>
-        ${state.imported ? '' : `<p class="muted">Demo data is fictional (fictional teams, fictional player handles) with distributions modelled on pro-play patterns from the Category 1 blueprint. It is labelled as demo everywhere in the UI so nobody mistakes it for real match telemetry. Swap it for real GRID data below — the analysis engine does not care where rows come from.</p>`}
-        ${state.imported ? '<p><button id="data-reset" class="btn ghost">Back to demo dataset</button></p>' : ''}
+        ${state.imported ? '' : `<p class="muted">Real GRID telemetry from the official Cloud9 starter repo: 1,025 ability casts (1,009 positioned from the ability supplement, 16 from the feed), 12 casts in one abandoned round excluded, 1,013 kept. Only aggregates are stored in this repo (licence) — see METHODOLOGY.md for the full pipeline, including the side discrepancy between the feed and the repo's CSVs and the 35% zone-containment rate.</p>`}
+        ${state.imported ? '' : `<p class="muted">Sample size &amp; uncertainty — one series is a snapshot, so every headline tendency also carries its presence and 95% Wilson interval: Sky Smoke @ B Long is present in 10 of 12 defensive rounds (83%, CI 55–95%); Recon Bolt @ A Lobby in 12 of 12 (100%, CI 76–100%). A ±10-point claim would need 62 rounds at p=0.80. Full table: METHODOLOGY.md.</p>`}
+        ${state.imported ? '<p><button id="data-reset" class="btn ghost">Back to the GRID dataset</button></p>' : ''}
       </article>
       <article class="card">
         <h3>Import real data (GRID-format CSV)</h3>
         <p>Columns: <code>map,team,player,agent,ability,x,y,side,round_time</code> — one row per ability cast. Operator rows use <code>ability=Operator</code>. Coordinates 0–100. GRID telemetry gives cast location and time; landing location is inferred the same way the blueprint allows (see METHODOLOGY.md).</p>
-        <textarea id="csv-in" rows="6" placeholder="map,team,player,agent,ability,x,y,side,round_time&#10;Ascent,IW,Vex,Cypher,Trapwire,50,52,def,0–20s"></textarea>
+        <textarea id="csv-in" rows="6" placeholder="map,team,player,agent,ability,x,y,side,round_time&#10;Bind,C9,v1c,Brimstone,Sky Smoke,51,51,def,40s+"></textarea>
         <p><button id="csv-load" class="btn">Load CSV into the tool</button>
         <button id="csv-sample" class="btn ghost">Load 5-row sample</button></p>
         <p id="csv-msg" class="muted"></p>
@@ -398,22 +418,21 @@ function renderData() {
     </section>
     <article class="card">
       <h3>Methodology in one paragraph</h3>
-      <p>Every percentage on this site is <code>events ÷ defensive rounds analysed</code> for the current filter, with the numerator and denominator shown next to it. Heat blobs are density summaries of the same plotted points — never a separate hidden model. Round-time buckets follow the blueprint (0–20s / 20–40s / 40s+). Full write-up: <code>METHODOLOGY.md</code> in the repo.</p>
+      <p>Every rate on this site is <code>events ÷ rounds analysed</code> for the current filter, shown as casts per round (a rate can exceed 1.0 — a player can cast the same ability twice in one round), with the numerator and denominator shown next to it. Heat blobs are density summaries of the same plotted points — never a separate hidden model. Round-time buckets follow the blueprint (0–20s / 20–40s / 40s+). Full write-up: <code>METHODOLOGY.md</code> in the repo.</p>
     </article>`;
   const reset = $('data-reset');
   if (reset) reset.addEventListener('click', () => { state.imported = null; render(); });
   $('csv-sample').addEventListener('click', () => {
     $('csv-in').value = 'map,team,player,agent,ability,x,y,side,round_time\n'
-      + 'Ascent,IW,Vex,Cypher,Trapwire,50,52,def,0–20s\n'
-      + 'Ascent,IW,Vex,Cypher,Trapwire,51,53,def,0–20s\n'
-      + 'Ascent,IW,Mira,Killjoy,Alarmbot,50,9,def,20–40s\n'
-      + 'Ascent,IW,Havoc,Jett,Operator,50,46,def,0–20s\n'
-      + 'Ascent,IW,Havoc,Jett,Operator,58,31,def,0–20s';
+      + 'Bind,C9,v1c,Brimstone,Sky Smoke,51,51,def,40s+\n'
+      + 'Bind,C9,v1c,Brimstone,Sky Smoke,52,50,def,40s+\n'
+      + 'Bind,C9,neT,Viper,Toxic Screen,51,11,def,0–20s\n'
+      + 'Bind,C9,OXY,Jett,Operator,51,44,def,0–20s\n'
+      + 'Bind,C9,OXY,Jett,Operator,78,12,def,0–20s';
   });
   $('csv-load').addEventListener('click', () => {
     const lines = $('csv-in').value.trim().split('\n');
     const util = [], ops = [];
-    let rounds = 0;
     const seenRounds = new Set();
     for (const line of lines.slice(1)) {
       const [map, teamId, player, agent, ability, x, y, side, rt] = line.split(',').map((s) => (s || '').trim());
@@ -457,6 +476,7 @@ function renderTabs() {
 }
 
 function render() {
+  renderTabs();
   renderFilters();
   ({ overview: renderOverview, heatmap: renderHeatmap, profiler: renderProfiler, antistrat: renderAntiStrat, planner: renderPlanner, data: renderData })[state.tab]();
 }

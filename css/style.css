@@ -26,9 +26,9 @@ body {
 .logo { font-size: 34px; color: var(--accent); line-height: 1; }
 .brand h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
 .brand p { margin: 0; color: var(--muted); font-size: 13px; }
-.demo-badge {
+.data-badge {
   font-size: 11px; font-weight: 700; letter-spacing: 1px;
-  color: #0b0e14; background: var(--accent-2);
+  color: #0b0e14; background: #80ed99;
   padding: 6px 10px; border-radius: 4px;
 }
 .filters {
@@ -54,7 +54,28 @@ body {
 .view h3 { font-size: 16px; margin: 0 0 8px; }
 .muted { color: var(--muted); font-size: 13px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 1100px) {
+  .bars li { grid-template-columns: 140px 1fr 40px; }
+}
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+  .topbar { padding: 12px 14px; gap: 10px; }
+  .brand h1 { font-size: 20px; }
+  .logo { font-size: 26px; }
+  .filters { padding: 10px 14px; gap: 10px; }
+  .filters label { flex: 1 1 44%; }
+  .filters select { min-width: 0; width: 100%; }
+  .tabs { padding: 8px 12px 0; flex-wrap: nowrap; overflow-x: auto; }
+  .tab { white-space: nowrap; padding: 8px 12px; }
+  .view { padding: 14px 14px 24px; min-height: 420px; }
+  .view h2 { font-size: 17px; }
+  .bars li { grid-template-columns: 96px 1fr 36px; font-size: 12px; gap: 8px; }
+  .mapsvg { max-height: 48vh; }
+  .card { padding: 12px 14px; }
+  .insight { flex-direction: column; gap: 6px; }
+  .planner-form input, .planner-form select { min-width: 0; width: 100%; }
+  .footer { padding: 16px 14px 24px; }
+}
 .card {
   background: var(--panel-2); border: 1px solid var(--line);
   border-radius: 10px; padding: 16px 18px; margin-bottom: 14px;
@@ -70,7 +91,8 @@ body {
 .bar { height: 10px; background: #0b0e14; border-radius: 5px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
 .map-wrap { background: #0d1220; border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 12px 0; }
-.mapsvg { width: 100%; height: auto; display: block; }
+.mapsvg { width: 100%; height: auto; max-height: 50vh; display: block; }
+.map-label-bg { fill: rgba(11, 14, 20, 0.88); stroke: #2b3648; stroke-width: 0.3; }
 .map-bg { fill: #101828; }
 .map-lane { stroke: #2b3648; stroke-width: 1.4; }
 .map-zone { fill: #182234; stroke: #2b3648; stroke-width: 0.7; }
