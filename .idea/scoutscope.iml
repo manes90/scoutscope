@@ -2,9 +2,18 @@
 <module type="WEB_MODULE" version="4">
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
-    <content url="file://$MODULE_DIR$/..">
-      <excludeFolder url="file://$MODULE_DIR$/../.git" />
-      <excludeFolder url="file://$MODULE_DIR$/../node_modules" />
+    <!-- Absolute content root: $MODULE_DIR$/.. resolved to the PARENT of the
+         project dir when run headless via bin/inspect.sh (verified 2026-11-20:
+         a relative root made the run analyse sibling projects under
+         ~/workspace/hackathons/ and zero files of this project). -->
+    <content url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026">
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/.git" />
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/node_modules" />
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/inspections/out" />
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/inspections/out2" />
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/inspections/out3" />
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/inspections/out4" />
+      <excludeFolder url="file:///home/hatch/workspace/hackathons/cloud9-jetbrains-2026/video/frames" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
